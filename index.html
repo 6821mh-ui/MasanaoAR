@@ -1,46 +1,93 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instant AR Card</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+<head>
+  <meta charset="UTF-8">
+  <title>AR名刺</title>
 
-    <style>
-      body { margin: 0; overflow: hidden; }
-      #scanning-overlay {
-        display: flex; align-items: center; justify-content: center;
-        position: absolute; left: 0; right: 0; top: 0; bottom: 0;
-        background: rgba(0,0,0,0.5); color: white; z-index: 2;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="scanning-overlay">名刺の画像部分にかざしてください...</div>
+  <!-- MindAR + Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.7/dist/mindar-image-three.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
 
-    <a-scene 
-      mindar-image="imageTargetSrc: ./targets.mind; filterMinCF:0.001; filterBeta: 0.01;" 
-      color-space="sRGB" 
-      renderer="colorManagement: true, physicallyCorrectLights" 
-      vr-mode-ui="enabled: false" 
-      device-orientation-permission-ui="enabled: false">
-      
-      <a-assets>
-        <a-asset-item id="avatarModel" src="./hoshinoAR0221.glb" crossorigin="anonymous"></a-asset-item>
-      </a-assets>
+  <style>
+    body, html { margin:0; overflow:hidden; }
+    #startButton {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 15px 25px;
+      font-size: 18px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+    }
+  </style>
+</head>
 
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+<body>
 
-      <a-entity mindar-image-target="targetIndex: 0">
-        <a-gltf-model 
-          rotation="45 0 0" 
-          position="0 0 0" 
-          scale="2 2 2" 
-          src="#avatarModel" 
-          animation-mixer="clip: *; loop: repeat; timeScale: 1;">
-        </a-gltf-model>
-      </a-entity>
-    </a-scene>
-  </body>
+<button id="startButton">タップして開始</button>
+
+<script>
+document.getElementById("startButton").addEventListener("click", async () => {
+
+  document.getElementById("startButton").style.display = "none";
+
+  const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+    container: document.body,
+    imageTargetSrc: "marker/marker.mind",
+  });
+
+  const {renderer, scene, camera} = mindarThree;
+
+  // アンカー
+  const anchor = mindarThree.addAnchor(0);
+
+  // ===== 音声 =====
+  const listener = new THREE.AudioListener();
+  camera.add(listener);
+
+  const sound = new THREE.Audio(listener);
+  const audioLoader = new THREE.AudioLoader();
+
+  audioLoader.load("assets/voice.mp3", (buffer) => {
+    sound.setBuffer(buffer);
+    sound.setLoop(false);
+    sound.setVolume(1.0);
+  });
+
+  // ===== 3Dモデル =====
+  const loader = new THREE.GLTFLoader();
+  loader.load("scene/model.glb", (gltf) => {
+    const model = gltf.scene;
+
+    model.scale.set(0.4, 0.4, 0.4);
+    model.rotation.y = Math.PI;
+
+    anchor.group.add(model);
+  });
+
+  // ===== マーカー検出 =====
+  anchor.onTargetFound = () => {
+    if (!sound.isPlaying) {
+      sound.play();
+    }
+  };
+
+  anchor.onTargetLost = () => {
+    sound.stop();
+  };
+
+  await mindarThree.start();
+
+  renderer.setAnimationLoop(() => {
+    renderer.render(scene, camera);
+  });
+
+});
+</script>
+
+</body>
 </html>
